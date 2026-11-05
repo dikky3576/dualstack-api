@@ -204,15 +204,14 @@ class ProductMediaController extends Controller
 
                 'thumbnail' => $product->thumbnail,
                 'thumbnail_url' => $product->thumbnail
-                    ? $publicDisk->url($product->thumbnail)
+                    ? asset('storage/' . ltrim($product->thumbnail, '/'))
                     : null,
-
                 'preview_images' => collect(
                     $product->preview_images ?? []
-                )->map(function ($path) use ($publicDisk) {
+                )->map(function ($path) {
                     return [
                         'path' => $path,
-                        'url' => $publicDisk->url($path),
+                        'url' => asset('storage/' . ltrim($path, '/')),
                     ];
                 })->values(),
 

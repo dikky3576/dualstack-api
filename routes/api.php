@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\Admin\ReportController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -31,6 +32,8 @@ Route::get('/user', function (Request $request) {
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/google', [GoogleAuthController::class, 'login'])
+        ->middleware('throttle:10,1');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);

@@ -178,6 +178,13 @@ class MidtransWebhookController extends Controller
 
             // Jangan menurunkan status pesanan yang sudah dibayar.
             if ($order->payment_status === 'paid') {
+                // Pesanan yang sudah lunas tapi statusnya masih tertinggal
+                // (mis. notifikasi ulang) ikut diselesaikan.
+                if (in_array($order->status, ['pending', 'processing'], true)) {
+                    $order->status = 'completed';
+                    $order->save();
+                }
+
                 return $order;
             }
 
@@ -191,8 +198,10 @@ class MidtransWebhookController extends Controller
                 $order->payment_status = 'paid';
                 $order->paid_at = now();
 
-                if ($order->status === 'pending') {
-                    $order->status = 'processing';
+                // Produk digital: tidak ada pengiriman fisik, jadi pesanan
+                // yang sudah dibayar langsung selesai (sama seperti pesanan gratis).
+                if (in_array($order->status, ['pending', 'processing'], true)) {
+                    $order->status = 'completed';
                 }
             } elseif ($transactionStatus === 'pending') {
                 $order->payment_status = 'pending';

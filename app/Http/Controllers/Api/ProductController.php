@@ -7,7 +7,6 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -169,19 +168,21 @@ class ProductController extends Controller
 
     private function appendMediaUrls(Product $product): Product
     {
-        $disk = Storage::disk('public');
-
+        // URL thumbnail publik.
         $product->setAttribute(
             'thumbnail_url',
             $product->thumbnail
-                ? $disk->url($product->thumbnail)
+                ? asset('storage/' . ltrim($product->thumbnail, '/'))
                 : null
         );
 
+        // URL seluruh gambar preview publik.
         $product->setAttribute(
             'preview_image_urls',
             collect($product->preview_images ?? [])
-                ->map(fn ($path) => $disk->url($path))
+                ->map(fn ($path) => asset(
+                    'storage/' . ltrim($path, '/')
+                ))
                 ->values()
         );
 

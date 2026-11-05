@@ -32,7 +32,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Registrasi berhasil.',
             'data' => [
-                'user' => $user->only(['id', 'name', 'email']),
+                'user' => $user->only(['id', 'name', 'email', 'role']),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -60,7 +60,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login berhasil.',
             'data' => [
-                'user' => $user->only(['id', 'name', 'email']),
+                'user' => $user->only(['id', 'name', 'email', 'role']),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -71,7 +71,7 @@ class AuthController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => $request->user()->only(['id', 'name', 'email']),
+            'data' => $request->user()->only(['id', 'name', 'email', 'role']),
         ]);
     }
 
