@@ -180,9 +180,7 @@ class ProductController extends Controller
         $product->setAttribute(
             'preview_image_urls',
             collect($product->preview_images ?? [])
-                ->map(fn ($path) => asset(
-                    'storage/' . ltrim($path, '/')
-                ))
+                ->map(fn ($path) => \Illuminate\Support\Facades\Storage::disk('public')->url($path))
                 ->values()
         );
 
