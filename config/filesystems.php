@@ -38,15 +38,6 @@ return [
             'report' => false,
         ],
 
-        'public' => [
-            'driver' => 'local',
-            'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
-            'visibility' => 'public',
-            'throw' => false,
-            'report' => false,
-        ],
-
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
@@ -60,12 +51,31 @@ return [
             'report' => false,
         ],
 
+        'public' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION', 'idn'),
+            'bucket' => env('AWS_BUCKET_PUBLIC', 'dualstack-public'),
+            'url' => env('AWS_PUBLIC_URL'),
+            'endpoint' => env('AWS_ENDPOINT', 'https://nos.wjv-1.neo.id'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'public',
+            'throw' => true,
+            'report' => true,
+        ],
+
         'template_downloads' => [
-            'driver' => 'local',
-            'root' => storage_path('app/private/templates'),
-            'serve' => false,
-            'throw' => false,
-            'report' => false,
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION', 'idn'),
+            'bucket' => env('AWS_BUCKET_PRIVATE', 'dualstack-private'),
+            'endpoint' => env('AWS_ENDPOINT', 'https://nos.wjv-1.neo.id'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => true,
         ],
 
     ],

@@ -204,14 +204,14 @@ class ProductMediaController extends Controller
 
                 'thumbnail' => $product->thumbnail,
                 'thumbnail_url' => $product->thumbnail
-                    ? asset('storage/' . ltrim($product->thumbnail, '/'))
+                    ? \Illuminate\Support\Facades\Storage::disk('public')->url($product->thumbnail)
                     : null,
                 'preview_images' => collect(
                     $product->preview_images ?? []
                 )->map(function ($path) {
                     return [
                         'path' => $path,
-                        'url' => asset('storage/' . ltrim($path, '/')),
+                        'url' => \Illuminate\Support\Facades\Storage::disk('public')->url($path),
                     ];
                 })->values(),
 

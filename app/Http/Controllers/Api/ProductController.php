@@ -172,7 +172,7 @@ class ProductController extends Controller
         $product->setAttribute(
             'thumbnail_url',
             $product->thumbnail
-                ? asset('storage/' . ltrim($product->thumbnail, '/'))
+                ? \Illuminate\Support\Facades\Storage::disk('public')->url($product->thumbnail)
                 : null
         );
 
