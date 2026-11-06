@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Product;
+use App\Models\Review;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
@@ -147,6 +150,72 @@ class UserController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
             ],
+        ]);
+    }
+
+    /**
+     * Menghapus pengguna.
+     *
+     * Pengguna yang sudah punya pesanan tidak boleh dihapus: pesanan adalah
+     * catatan transaksi (orders.user_id memakai restrictOnDelete).
+     */
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $user = User::query()->withCount('orders')->findOrFail($id);
+
+        if ($user->id === $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun sendiri tidak dapat dihapus.',
+            ], 422);
+        }
+
+        // Lindungi agar selalu ada minimal satu administrator.
+        if (
+            $user->role === 'admin' &&
+            User::where('role', 'admin')->count() <= 1
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat menghapus administrator terakhir.',
+            ], 422);
+        }
+
+        if ($user->orders_count > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Pengguna ini punya {$user->orders_count} pesanan dan tidak dapat dihapus, karena pesanan adalah catatan transaksi.",
+            ], 409);
+        }
+
+        DB::transaction(function () use ($user) {
+            // Ulasan ikut terhapus lewat cascade, tetapi rating rata-rata
+            // produknya harus dihitung ulang secara manual.
+            $productIds = Review::query()
+                ->where('user_id', $user->id)
+                ->pluck('product_id')
+                ->unique();
+
+            // Cabut semua token login; wishlist dan catatan unduhan ikut
+            // terhapus lewat cascade.
+            $user->tokens()->delete();
+
+            Review::query()->where('user_id', $user->id)->delete();
+
+            $user->delete();
+
+            foreach ($productIds as $productId) {
+                $average = Review::where('product_id', $productId)->avg('rating');
+
+                Product::whereKey($productId)->update([
+                    'average_rating' => round((float) ($average ?? 0), 2),
+                ]);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pengguna berhasil dihapus.',
         ]);
     }
 }

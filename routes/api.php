@@ -75,6 +75,8 @@ Route::middleware(['auth:sanctum', 'admin'])
 
         Route::put('/users/{id}', [AdminUserController::class, 'update']);
 
+        Route::delete('/users/{id}', [AdminUserController::class, 'destroy']);
+
         Route::patch('/users/{id}/role', [
             AdminUserController::class,
             'updateRole',
