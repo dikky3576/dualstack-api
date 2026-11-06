@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
@@ -32,6 +33,8 @@ class ProductController extends Controller
             })
             ->latest()
             ->paginate(min((int) $request->input('per_page', 10), 100));
+
+        $products->through(fn (Product $product) => $this->withMediaUrls($product));
 
         return response()->json([
             'success' => true,
@@ -71,7 +74,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Produk berhasil ditambahkan.',
-            'data' => $product->load('category'),
+            'data' => $this->withMediaUrls($product->load('category')),
         ], 201);
     }
 
@@ -80,7 +83,9 @@ class ProductController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $product = Product::with('category')->findOrFail($id);
+        $product = $this->withMediaUrls(
+            Product::with('category')->findOrFail($id)
+        );
 
         return response()->json([
             'success' => true,
@@ -127,7 +132,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Produk berhasil diperbarui.',
-            'data' => $product->fresh()->load('category'),
+            'data' => $this->withMediaUrls($product->fresh()->load('category')),
         ]);
     }
 
@@ -144,4 +149,28 @@ class ProductController extends Controller
             'message' => 'Produk berhasil dihapus.',
         ]);
     }
+
+    /**
+     * Menambahkan URL publik gambar, dibuat dengan cara yang sama seperti
+     * endpoint katalog publik, agar admin dan toko selalu memakai alamat yang sama.
+     */
+    private function withMediaUrls(Product $product): Product
+    {
+        $disk = Storage::disk('public');
+
+        $product->setAttribute(
+            'thumbnail_url',
+            $product->thumbnail ? $disk->url($product->thumbnail) : null
+        );
+
+        $product->setAttribute(
+            'preview_image_urls',
+            collect($product->preview_images ?? [])
+                ->map(fn ($path) => $disk->url($path))
+                ->values()
+        );
+
+        return $product;
+    }
 }
+    
