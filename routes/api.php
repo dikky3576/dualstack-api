@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\ProductDownloadController;
 use App\Http\Controllers\Api\CustomerDashboardController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CustomerWishlistController;
+use App\Http\Controllers\Api\CustomerDownloadController;
 use App\Http\Controllers\Api\ProductReviewController;
 
 Route::get('/user', function (Request $request) {
@@ -123,6 +124,12 @@ Route::middleware('auth:sanctum')
         Route::post('/wishlist', [
             CustomerWishlistController::class,
             'store',
+        ]);
+
+        // Template gratis yang pernah diunduh pelanggan.
+        Route::get('/downloads', [
+            CustomerDownloadController::class,
+            'index',
         ]);
 
         Route::delete('/wishlist/{productId}', [

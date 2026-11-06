@@ -137,16 +137,23 @@ class ProductController extends Controller
     }
 
     /**
-     * Menghapus produk secara soft delete.
+     * Menghapus produk. Yang belum pernah dipesan dihapus permanen beserta
+     * filenya; yang sudah pernah dipesan tetap soft delete agar riwayat
+     * pesanan tidak rusak.
      */
     public function destroy(string $id): JsonResponse
     {
         $product = Product::findOrFail($id);
-        $product->delete();
+        $removed = $product->purge();
 
         return response()->json([
             'success' => true,
-            'message' => 'Produk berhasil dihapus.',
+            'message' => $removed
+                ? 'Produk berhasil dihapus permanen.'
+                : 'Produk berhasil dihapus. Datanya tetap disimpan karena sudah ada di riwayat pesanan.',
+            'data' => [
+                'permanently_deleted' => $removed,
+            ],
         ]);
     }
 

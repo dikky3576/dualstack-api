@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductDownload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -79,6 +80,14 @@ class ProductDownloadController extends Controller
             '_',
             $fileName
         );
+
+        // Catat unduhan template gratis: ini yang membuka hak memberi ulasan.
+        if ($product->is_free) {
+            ProductDownload::firstOrCreate([
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+            ]);
+        }
 
         return $disk->download(
             $storedFile,

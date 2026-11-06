@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductDownload;
 use App\Models\Review;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -105,10 +106,20 @@ class ProductReviewController extends Controller
             ->latest('paid_at')
             ->first();
 
-        if (! $order) {
+        // Template gratis tidak punya pesanan: unduhan yang tercatat sudah cukup.
+        $hasFreeDownload = ! $order
+            && $product->is_free
+            && ProductDownload::query()
+                ->where('user_id', $user->id)
+                ->where('product_id', $product->id)
+                ->exists();
+
+        if (! $order && ! $hasFreeDownload) {
             return response()->json([
                 'success' => false,
-                'message' => 'Kamu harus membeli dan menyelesaikan pembayaran produk sebelum memberikan review.',
+                'message' => $product->is_free
+                    ? 'Unduh template ini terlebih dahulu sebelum memberikan review.'
+                    : 'Kamu harus membeli dan menyelesaikan pembayaran produk sebelum memberikan review.',
             ], 403);
         }
 
@@ -121,7 +132,7 @@ class ProductReviewController extends Controller
             $review = Review::create([
                 'user_id' => $user->id,
                 'product_id' => $product->id,
-                'order_id' => $order->id,
+                'order_id' => $order?->id,
                 'rating' => $validated['rating'],
                 'comment' => $validated['comment'] ?? null,
             ]);
