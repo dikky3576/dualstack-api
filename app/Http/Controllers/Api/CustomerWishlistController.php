@@ -34,6 +34,25 @@ class CustomerWishlistController extends Controller
     }
 
     /**
+     * Mengecek apakah produk sudah ada di wishlist pelanggan.
+     */
+    public function show(Request $request, string $productId): JsonResponse
+    {
+        $inWishlist = Wishlist::query()
+            ->where('user_id', $request->user()->id)
+            ->where('product_id', $productId)
+            ->exists();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status wishlist berhasil diambil.',
+            'data' => [
+                'in_wishlist' => $inWishlist,
+            ],
+        ]);
+    }
+
+    /**
      * Menambahkan produk ke wishlist.
      */
     public function store(Request $request): JsonResponse

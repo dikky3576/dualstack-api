@@ -114,6 +114,12 @@ Route::middleware('auth:sanctum')
             'index',
         ]);
 
+        // Apakah produk ini sudah ada di wishlist pelanggan.
+        Route::get('/wishlist/{productId}', [
+            CustomerWishlistController::class,
+            'show',
+        ]);
+
         Route::post('/wishlist', [
             CustomerWishlistController::class,
             'store',
