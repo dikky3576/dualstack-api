@@ -60,7 +60,7 @@ class GoogleAuthController extends Controller
                 'body' => Str::limit($response->body(), 200),
             ]);
 
-            return $this->invalidToken();
+            return $this->invalidToken('tokeninfo_rejected');
         }
 
         $emailVerified = filter_var(
@@ -89,7 +89,7 @@ class GoogleAuthController extends Controller
                 'expected_aud' => $clientId,
             ]);
 
-            return $this->invalidToken();
+            return $this->invalidToken($reason);
         }
 
         $email = strtolower($claims['email']);
@@ -126,11 +126,16 @@ class GoogleAuthController extends Controller
         ]);
     }
 
-    private function invalidToken(): JsonResponse
+    /**
+     * $code hanya nama pemeriksaan yang gagal (mis. aud_mismatch), tidak
+     * berisi token atau data pengguna, jadi aman dikirim ke browser.
+     */
+    private function invalidToken(string $code = 'invalid_token'): JsonResponse
     {
         return response()->json([
             'success' => false,
             'message' => 'Token Google tidak valid atau sudah kedaluwarsa.',
+            'code' => $code,
         ], 401);
     }
 }
