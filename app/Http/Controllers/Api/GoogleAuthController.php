@@ -25,9 +25,10 @@ class GoogleAuthController extends Controller
             'credential' => ['required', 'string', 'max:4096'],
         ]);
 
-        $clientId = config('services.google.client_id');
+        // trim: spasi atau baris baru tersembunyi di .env membuat aud tidak cocok.
+        $clientId = trim((string) config('services.google.client_id'));
 
-        if (! is_string($clientId) || $clientId === '') {
+        if ($clientId === '') {
             return response()->json([
                 'success' => false,
                 'message' => 'Login Google belum dikonfigurasi.',
@@ -53,6 +54,12 @@ class GoogleAuthController extends Controller
         $claims = $response->successful() ? $response->json() : null;
 
         if (! is_array($claims)) {
+            Log::warning('Google login rejected', [
+                'reason' => 'tokeninfo_rejected',
+                'status' => $response->status(),
+                'body' => Str::limit($response->body(), 200),
+            ]);
+
             return $this->invalidToken();
         }
 
@@ -61,18 +68,27 @@ class GoogleAuthController extends Controller
             FILTER_VALIDATE_BOOLEAN
         );
 
-        if (
-            ($claims['aud'] ?? null) !== $clientId ||
+        $reason = match (true) {
+            ($claims['aud'] ?? null) !== $clientId => 'aud_mismatch',
             ! in_array(
                 $claims['iss'] ?? null,
                 ['accounts.google.com', 'https://accounts.google.com'],
                 true
-            ) ||
-            (int) ($claims['exp'] ?? 0) < time() ||
-            ! $emailVerified ||
-            ! is_string($claims['email'] ?? null) ||
-            $claims['email'] === ''
-        ) {
+            ) => 'iss_invalid',
+            (int) ($claims['exp'] ?? 0) < time() => 'expired',
+            ! $emailVerified => 'email_not_verified',
+            ! is_string($claims['email'] ?? null) || $claims['email'] === '' => 'email_missing',
+            default => null,
+        };
+
+        if ($reason !== null) {
+            // Client ID bukan rahasia, aman dicatat untuk membandingkan nilainya.
+            Log::warning('Google login rejected', [
+                'reason' => $reason,
+                'token_aud' => $claims['aud'] ?? null,
+                'expected_aud' => $clientId,
+            ]);
+
             return $this->invalidToken();
         }
 
