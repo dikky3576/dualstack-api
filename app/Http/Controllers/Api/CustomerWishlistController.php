@@ -34,6 +34,24 @@ class CustomerWishlistController extends Controller
     }
 
     /**
+     * ID semua produk di wishlist pelanggan (untuk ikon hati di kartu katalog).
+     */
+    public function ids(Request $request): JsonResponse
+    {
+        $ids = Wishlist::query()
+            ->where('user_id', $request->user()->id)
+            ->pluck('product_id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'ID wishlist berhasil diambil.',
+            'data' => $ids,
+        ]);
+    }
+
+    /**
      * Mengecek apakah produk sudah ada di wishlist pelanggan.
      */
     public function show(Request $request, string $productId): JsonResponse

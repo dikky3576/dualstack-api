@@ -109,6 +109,10 @@ class GoogleAuthController extends Controller
                 'password' => Str::random(64),
             ]);
 
+            // Tandai bahwa pemilik akun belum menetapkan password sendiri,
+            // agar halaman Profil menawarkan "Atur password" tanpa password lama.
+            $user->forceFill(['password_set' => false])->save();
+
             // Muat ulang agar kolom bawaan database (role) ikut terbaca.
             $user->refresh();
         }

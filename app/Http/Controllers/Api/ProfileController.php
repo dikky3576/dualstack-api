@@ -27,6 +27,7 @@ class ProfileController extends Controller
                 'role' => $user->role,
                 'created_at' => $user->created_at,
                 'orders_count' => $user->orders()->count(),
+                'has_password' => $user->hasPassword(),
             ],
         ]);
     }
@@ -65,18 +66,23 @@ class ProfileController extends Controller
     }
 
     /**
-     * Mengganti password pengguna.
+     * Mengganti password pengguna. Akun yang dibuat lewat Google belum punya
+     * password, jadi untuk pertama kalinya cukup menetapkan password baru.
      */
     public function updatePassword(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $hasPassword = $user->hasPassword();
+
         $validated = $request->validate([
-            'current_password' => ['required', 'string'],
+            'current_password' => [Rule::requiredIf($hasPassword), 'nullable', 'string'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $user = $request->user();
-
-        if (! Hash::check($validated['current_password'], $user->password)) {
+        if (
+            $hasPassword &&
+            ! Hash::check($validated['current_password'], $user->password)
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Password saat ini tidak sesuai.',
@@ -84,6 +90,11 @@ class ProfileController extends Controller
         }
 
         $user->password = Hash::make($validated['password']);
+        // Hanya bila kolomnya sudah ada (migrasi sudah dijalankan).
+        if (array_key_exists('password_set', $user->getAttributes())) {
+            $user->password_set = true;
+        }
+
         $user->save();
 
         // Cabut seluruh token agar pengguna perlu login ulang.

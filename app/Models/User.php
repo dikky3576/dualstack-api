@@ -29,7 +29,22 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'password_set' => 'boolean',
         ];
+    }
+
+    /**
+     * Apakah pemilik akun sudah menetapkan password sendiri. Akun yang dibuat
+     * lewat Google belum.
+     *
+     * Gagal dengan aman: bila kolom password_set belum ada (migrasi belum
+     * dijalankan), dianggap sudah punya password supaya password lama tetap
+     * diminta saat mengganti password.
+     */
+    public function hasPassword(): bool
+    {
+        return ! array_key_exists('password_set', $this->attributes)
+            || (bool) $this->attributes['password_set'];
     }
 
     public function orders(): HasMany

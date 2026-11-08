@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\ProductMediaController;
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\ReportController;
 
 
@@ -16,6 +17,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\GoogleAuthController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -34,6 +36,12 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/google', [GoogleAuthController::class, 'login'])
+        ->middleware('throttle:10,1');
+
+    // Lupa password: kirim link ke email, lalu atur password baru.
+    Route::post('/forgot-password', [PasswordResetController::class, 'forgot'])
+        ->middleware('throttle:5,1');
+    Route::post('/reset-password', [PasswordResetController::class, 'reset'])
         ->middleware('throttle:10,1');
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -82,6 +90,11 @@ Route::middleware(['auth:sanctum', 'admin'])
             'updateRole',
         ]);
 
+        // Moderasi ulasan.
+        Route::get('/reviews', [AdminReviewController::class, 'index']);
+
+        Route::delete('/reviews/{id}', [AdminReviewController::class, 'destroy']);
+
         Route::post('/products/{productId}/media', [
             ProductMediaController::class,
             'store',
@@ -117,6 +130,12 @@ Route::middleware('auth:sanctum')
             'index',
         ]);
 
+        // ID semua produk di wishlist (harus sebelum /wishlist/{productId}).
+        Route::get('/wishlist/ids', [
+            CustomerWishlistController::class,
+            'ids',
+        ]);
+
         // Apakah produk ini sudah ada di wishlist pelanggan.
         Route::get('/wishlist/{productId}', [
             CustomerWishlistController::class,
@@ -140,6 +159,11 @@ Route::middleware('auth:sanctum')
         ]);
 
         // Manajemen review pelanggan.
+        Route::get('/reviews', [
+            ProductReviewController::class,
+            'mine',
+        ]);
+
         Route::post('/reviews', [
             ProductReviewController::class,
             'store',

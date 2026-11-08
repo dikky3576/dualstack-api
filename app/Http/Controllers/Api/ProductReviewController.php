@@ -55,6 +55,36 @@ class ProductReviewController extends Controller
     }
 
     /**
+     * Daftar review milik pelanggan yang sedang login.
+     */
+    public function mine(Request $request): JsonResponse
+    {
+        $reviews = Review::query()
+            ->where('user_id', $request->user()->id)
+            ->with('product:id,name,slug')
+            ->latest()
+            ->limit(200)
+            ->get()
+            // Produk yang sudah dihapus tidak ikut dimuat (soft delete).
+            ->filter(fn (Review $review) => $review->product !== null)
+            ->map(fn (Review $review) => [
+                'id' => $review->id,
+                'product_slug' => $review->product->slug,
+                'product_name' => $review->product->name,
+                'rating' => $review->rating,
+                'comment' => $review->comment,
+                'created_at' => $review->created_at,
+            ])
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Review milik pelanggan berhasil diambil.',
+            'data' => $reviews,
+        ]);
+    }
+
+    /**
      * Pelanggan membuat review produk.
      */
     public function store(Request $request): JsonResponse
