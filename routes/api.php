@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -44,7 +45,14 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password', [PasswordResetController::class, 'reset'])
         ->middleware('throttle:10,1');
 
+    // Verifikasi email: link dari email (tanpa login) dan kirim ulang.
+    Route::post('/verify-email', [EmailVerificationController::class, 'verify'])
+        ->middleware('throttle:10,1');
+
     Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/email/resend', [EmailVerificationController::class, 'resend'])
+            ->middleware('throttle:3,1');
+
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });

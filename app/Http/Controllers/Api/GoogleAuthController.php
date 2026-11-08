@@ -111,10 +111,20 @@ class GoogleAuthController extends Controller
 
             // Tandai bahwa pemilik akun belum menetapkan password sendiri,
             // agar halaman Profil menawarkan "Atur password" tanpa password lama.
-            $user->forceFill(['password_set' => false])->save();
+            // Google sudah memverifikasi emailnya, jadi tidak perlu verifikasi lagi.
+            $user->forceFill([
+                'password_set' => false,
+                'email_verified_at' => now(),
+            ])->save();
 
             // Muat ulang agar kolom bawaan database (role) ikut terbaca.
             $user->refresh();
+        }
+
+        // Akun yang daftar dengan password lalu masuk lewat Google: email-nya
+        // terbukti milik orang yang sama, jadi tandai terverifikasi.
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
         }
 
         $token = $user->createToken('dualstack-web')->plainTextToken;
@@ -123,7 +133,7 @@ class GoogleAuthController extends Controller
             'success' => true,
             'message' => 'Login Google berhasil.',
             'data' => [
-                'user' => $user->only(['id', 'name', 'email', 'role']),
+                'user' => $user->only(['id', 'name', 'email', 'role', 'email_verified']),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],

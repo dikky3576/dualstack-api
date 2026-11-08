@@ -2,7 +2,8 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasApiTokens, Notifiable;
@@ -45,6 +46,14 @@ class User extends Authenticatable
     {
         return ! array_key_exists('password_set', $this->attributes)
             || (bool) $this->attributes['password_set'];
+    }
+
+    /**
+     * Dipakai di respons API sebagai `email_verified` (boolean).
+     */
+    protected function emailVerified(): Attribute
+    {
+        return Attribute::get(fn () => $this->hasVerifiedEmail());
     }
 
     public function orders(): HasMany

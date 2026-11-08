@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -26,13 +27,24 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
+        // Gagal kirim email tidak boleh menggagalkan pendaftaran: pengguna
+        // bisa meminta kirim ulang dari banner di situs.
+        try {
+            $user->sendEmailVerificationNotification();
+        } catch (\Throwable $e) {
+            Log::error('Verification email failed', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
         $token = $user->createToken('dualstack-web')->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'Registrasi berhasil.',
             'data' => [
-                'user' => $user->only(['id', 'name', 'email', 'role']),
+                'user' => $user->only(['id', 'name', 'email', 'role', 'email_verified']),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -60,7 +72,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login berhasil.',
             'data' => [
-                'user' => $user->only(['id', 'name', 'email', 'role']),
+                'user' => $user->only(['id', 'name', 'email', 'role', 'email_verified']),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -71,7 +83,7 @@ class AuthController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => $request->user()->only(['id', 'name', 'email', 'role']),
+            'data' => $request->user()->only(['id', 'name', 'email', 'role', 'email_verified']),
         ]);
     }
 

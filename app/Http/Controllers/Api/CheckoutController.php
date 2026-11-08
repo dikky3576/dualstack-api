@@ -18,6 +18,15 @@ class CheckoutController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        // Membeli mewajibkan email yang sudah terverifikasi.
+        if (! $request->user()->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Verifikasi emailmu dulu sebelum membeli. Cek kotak masuk, atau kirim ulang email verifikasi dari banner di atas.',
+                'code' => 'email_not_verified',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1', 'max:50'],
             'items.*.product_id' => [

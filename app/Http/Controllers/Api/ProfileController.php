@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
 
@@ -28,6 +29,7 @@ class ProfileController extends Controller
                 'created_at' => $user->created_at,
                 'orders_count' => $user->orders()->count(),
                 'has_password' => $user->hasPassword(),
+                'email_verified' => $user->hasVerifiedEmail(),
             ],
         ]);
     }
@@ -49,9 +51,28 @@ class ProfileController extends Controller
             ],
         ]);
 
+        $emailChanged = strcasecmp($user->email, $validated['email']) !== 0;
+
         $user->name = $validated['name'];
         $user->email = $validated['email'];
+
+        // Email baru belum terbukti milik pengguna: minta verifikasi ulang.
+        if ($emailChanged) {
+            $user->email_verified_at = null;
+        }
+
         $user->save();
+
+        if ($emailChanged) {
+            try {
+                $user->sendEmailVerificationNotification();
+            } catch (\Throwable $e) {
+                Log::error('Verification email failed', [
+                    'exception' => $e::class,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -61,6 +82,7 @@ class ProfileController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'email_verified' => $user->hasVerifiedEmail(),
             ],
         ]);
     }

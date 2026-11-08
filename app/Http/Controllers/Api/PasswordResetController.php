@@ -63,6 +63,8 @@ class PasswordResetController extends Controller
                 $user->forceFill([
                     'password' => $password,
                     'remember_token' => Str::random(60),
+                    // Link reset dikirim ke emailnya, jadi email itu terbukti miliknya.
+                    'email_verified_at' => $user->email_verified_at ?? now(),
                 ]);
 
                 // Kolom ini baru ada setelah migrasinya dijalankan.
