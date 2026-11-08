@@ -74,8 +74,15 @@ class OrderController extends Controller
             ], 422);
         }
 
+        $becameCancelled = $order->status !== 'cancelled'
+            && $validated['status'] === 'cancelled';
+
         $order->status = $validated['status'];
         $order->save();
+
+        if ($becameCancelled && $order->payment_status !== 'paid') {
+            $order->releaseCoupon();
+        }
 
         return response()->json([
             'success' => true,

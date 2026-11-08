@@ -203,6 +203,11 @@ class MidtransWebhookController extends Controller
                 $order->paid_at = now();
                 $justPaid = true;
 
+                // Kuota sudah dikembalikan saat pesanan dibatalkan; ambil lagi.
+                if ($order->status === 'cancelled') {
+                    $order->consumeCoupon();
+                }
+
                 // Produk digital: tidak ada pengiriman fisik, jadi pesanan
                 // yang sudah dibayar langsung selesai (sama seperti pesanan gratis).
                 // 'cancelled' ikut: uangnya sudah masuk (mis. dibayar dari tab
@@ -214,9 +219,19 @@ class MidtransWebhookController extends Controller
                 $order->payment_status = 'pending';
             } elseif ($transactionStatus === 'expire') {
                 $order->payment_status = 'expired';
+
+                if ($order->status !== 'cancelled') {
+                    $order->releaseCoupon();
+                }
+
                 $order->status = 'cancelled';
             } elseif ($transactionStatus === 'cancel') {
                 $order->payment_status = 'cancelled';
+
+                if ($order->status !== 'cancelled') {
+                    $order->releaseCoupon();
+                }
+
                 $order->status = 'cancelled';
             } elseif ($transactionStatus === 'deny') {
                 $order->payment_status = 'failed';

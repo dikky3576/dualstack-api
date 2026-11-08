@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\ProductMediaController;
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\ReportController;
+use App\Http\Controllers\Api\Admin\CouponController as AdminCouponController;
 
 
 use App\Http\Controllers\Api\CategoryController;
@@ -98,6 +99,10 @@ Route::middleware(['auth:sanctum', 'admin'])
             AdminUserController::class,
             'updateRole',
         ]);
+
+        // Kupon diskon.
+        Route::apiResource('coupons', AdminCouponController::class)
+            ->except(['show']);
 
         // Moderasi ulasan.
         Route::get('/reviews', [AdminReviewController::class, 'index']);
@@ -199,6 +204,9 @@ Route::middleware('auth:sanctum')->prefix('orders')->group(function () {
     Route::get('/{id}', [OrderController::class, 'show']);
     Route::post('/{id}/payment', [OrderController::class, 'payment']);
     Route::post('/{id}/cancel', [OrderController::class, 'cancel']);
+    Route::post('/{id}/coupon', [OrderController::class, 'applyCoupon'])
+        ->middleware('throttle:20,1');
+    Route::delete('/{id}/coupon', [OrderController::class, 'removeCoupon']);
 });
 
 Route::post('/midtrans/notification', [
