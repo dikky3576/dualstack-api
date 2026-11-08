@@ -7,6 +7,7 @@ use App\Models\Order;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Config as MidtransConfig;
 use Midtrans\Snap;
@@ -39,6 +40,92 @@ class OrderController extends Controller
             'success' => true,
             'message' => 'Detail pesanan berhasil diambil.',
             'data' => $order,
+        ]);
+    }
+
+    /**
+     * Pelanggan membatalkan pesanan yang belum dibayar.
+     *
+     * Bila transaksi Snap sudah dibuka, transaksinya dibatalkan juga di
+     * Midtrans supaya tidak bisa dibayar belakangan dari tab yang lama.
+     */
+    public function cancel(Request $request, string $id): JsonResponse
+    {
+        $order = Order::query()
+            ->where('user_id', $request->user()->id)
+            ->findOrFail($id);
+
+        if ($order->payment_status !== 'pending' || $order->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan ini tidak dapat dibatalkan.',
+            ], 422);
+        }
+
+        $serverKey = config('services.midtrans.server_key');
+
+        if ($order->payment_method === 'midtrans_snap' && ! empty($serverKey)) {
+            MidtransConfig::$serverKey = $serverKey;
+            MidtransConfig::$isProduction = (bool) config(
+                'services.midtrans.is_production',
+                false
+            );
+
+            try {
+                \Midtrans\Transaction::cancel($order->order_number);
+            } catch (\Throwable $e) {
+                $code = (int) $e->getCode();
+
+                // 404: belum ada transaksi di Midtrans (metode bayar belum
+                // dipilih), jadi tidak ada yang perlu dibatalkan di sana.
+                if ($code !== 404) {
+                    Log::warning('Midtrans cancel failed', [
+                        'order_id' => $order->order_number,
+                        'code' => $code,
+                        'message' => $e->getMessage(),
+                    ]);
+
+                    // 412: transaksi sudah tidak berstatus pending (mis. sudah dibayar).
+                    return response()->json([
+                        'success' => false,
+                        'message' => $code === 412
+                            ? 'Pesanan ini sudah tidak dapat dibatalkan. Muat ulang halaman untuk melihat statusnya.'
+                            : 'Pembatalan belum dapat diproses. Coba lagi sebentar lagi.',
+                    ], $code === 412 ? 409 : 502);
+                }
+            }
+        }
+
+        $cancelled = DB::transaction(function () use ($order) {
+            $fresh = Order::whereKey($order->id)->lockForUpdate()->first();
+
+            // Status bisa berubah (mis. webhook pembayaran) sejak dibaca di atas.
+            if (
+                ! $fresh ||
+                $fresh->payment_status !== 'pending' ||
+                $fresh->status !== 'pending'
+            ) {
+                return null;
+            }
+
+            $fresh->status = 'cancelled';
+            $fresh->payment_status = 'cancelled';
+            $fresh->save();
+
+            return $fresh;
+        });
+
+        if (! $cancelled) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Status pesanan baru saja berubah. Muat ulang halaman.',
+            ], 409);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pesanan dibatalkan.',
+            'data' => $cancelled->load('items'),
         ]);
     }
 

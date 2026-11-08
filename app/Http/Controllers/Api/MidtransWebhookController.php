@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Notifications\OrderPaid;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -148,7 +149,10 @@ class MidtransWebhookController extends Controller
         }
 
 
-        $order = DB::transaction(function () use ($payload) {
+        // true hanya saat pesanan baru saja berubah menjadi lunas.
+        $justPaid = false;
+
+        $order = DB::transaction(function () use ($payload, &$justPaid) {
             $order = Order::where(
                 'order_number',
                 $payload['order_id']
@@ -197,10 +201,13 @@ class MidtransWebhookController extends Controller
             ) {
                 $order->payment_status = 'paid';
                 $order->paid_at = now();
+                $justPaid = true;
 
                 // Produk digital: tidak ada pengiriman fisik, jadi pesanan
                 // yang sudah dibayar langsung selesai (sama seperti pesanan gratis).
-                if (in_array($order->status, ['pending', 'processing'], true)) {
+                // 'cancelled' ikut: uangnya sudah masuk (mis. dibayar dari tab
+                // lama sebelum pesanan dibatalkan), jadi template harus diberikan.
+                if (in_array($order->status, ['pending', 'processing', 'cancelled'], true)) {
                     $order->status = 'completed';
                 }
             } elseif ($transactionStatus === 'pending') {
@@ -236,6 +243,26 @@ class MidtransWebhookController extends Controller
                 'success' => false,
                 'message' => 'Nominal pembayaran tidak cocok.',
             ], 422);
+        }
+
+        // Email bukti pembayaran dikirim setelah respons ke Midtrans terkirim,
+        // supaya SMTP yang lambat tidak membuat webhook timeout.
+        if ($justPaid && $order instanceof Order) {
+            $orderId = $order->id;
+
+            dispatch(function () use ($orderId) {
+                try {
+                    $paid = Order::with(['items', 'user'])->find($orderId);
+
+                    $paid?->user?->notify(new OrderPaid($paid));
+                } catch (\Throwable $e) {
+                    Log::error('Order paid email failed', [
+                        'order_id' => $orderId,
+                        'exception' => $e::class,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
+            })->afterResponse();
         }
 
         return response()->json([

@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\EmailVerificationController;
+use App\Http\Controllers\Api\SitemapController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -197,6 +198,7 @@ Route::middleware('auth:sanctum')->prefix('orders')->group(function () {
     Route::get('/', [OrderController::class, 'index']);
     Route::get('/{id}', [OrderController::class, 'show']);
     Route::post('/{id}/payment', [OrderController::class, 'payment']);
+    Route::post('/{id}/cancel', [OrderController::class, 'cancel']);
 });
 
 Route::post('/midtrans/notification', [
@@ -213,6 +215,10 @@ Route::middleware('auth:sanctum')->get(
     '/customer/dashboard',
     [CustomerDashboardController::class, 'index']
 );
+
+// Sitemap untuk mesin pencari (dirujuk dari robots.txt frontend).
+Route::get('/sitemap.xml', [SitemapController::class, 'index'])
+    ->middleware('throttle:60,1');
 
 Route::get('/categories', [CategoryController::class, 'index']);
 
