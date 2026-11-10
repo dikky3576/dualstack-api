@@ -35,6 +35,12 @@ return [
         ],
     ],
 
+    // Email pemilik yang diberi tahu saat ada permintaan proyek baru.
+    // Kosong = permintaan tetap tersimpan, hanya tanpa email.
+    'project_requests' => [
+        'notify_email' => env('PROJECT_REQUEST_NOTIFY_EMAIL'),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
     ],

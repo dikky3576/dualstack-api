@@ -24,6 +24,8 @@ use App\Http\Controllers\Api\SitemapController;
 use App\Http\Controllers\Api\PromoController;
 use App\Http\Controllers\Api\TrackController;
 use App\Http\Controllers\Api\Admin\ViewStatsController;
+use App\Http\Controllers\Api\ProjectRequestController;
+use App\Http\Controllers\Api\Admin\ProjectRequestController as AdminProjectRequestController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -119,6 +121,11 @@ Route::middleware(['auth:sanctum', 'admin'])
         ]);
 
         Route::get('/stats/views', [ViewStatsController::class, 'index']);
+
+        // Permintaan proyek dari halaman Jasa.
+        Route::get('/project-requests', [AdminProjectRequestController::class, 'index']);
+        Route::put('/project-requests/{id}', [AdminProjectRequestController::class, 'update']);
+        Route::delete('/project-requests/{id}', [AdminProjectRequestController::class, 'destroy']);
 
         Route::get('/reports/sales', [
             ReportController::class,
@@ -233,6 +240,10 @@ Route::middleware('auth:sanctum')->get(
 // Sitemap untuk mesin pencari (dirujuk dari robots.txt frontend).
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])
     ->middleware('throttle:60,1');
+
+// Formulir permintaan proyek (publik, dibatasi agar tidak jadi sasaran spam).
+Route::post('/project-requests', [ProjectRequestController::class, 'store'])
+    ->middleware('throttle:5,10');
 
 // Pencatat kunjungan (hitungan harian, tanpa data pribadi).
 Route::post('/track', [TrackController::class, 'store'])
