@@ -22,6 +22,8 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\SitemapController;
 use App\Http\Controllers\Api\PromoController;
+use App\Http\Controllers\Api\TrackController;
+use App\Http\Controllers\Api\Admin\ViewStatsController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -115,6 +117,8 @@ Route::middleware(['auth:sanctum', 'admin'])
             ProductMediaController::class,
             'store',
         ]);
+
+        Route::get('/stats/views', [ViewStatsController::class, 'index']);
 
         Route::get('/reports/sales', [
             ReportController::class,
@@ -229,6 +233,10 @@ Route::middleware('auth:sanctum')->get(
 // Sitemap untuk mesin pencari (dirujuk dari robots.txt frontend).
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])
     ->middleware('throttle:60,1');
+
+// Pencatat kunjungan (hitungan harian, tanpa data pribadi).
+Route::post('/track', [TrackController::class, 'store'])
+    ->middleware('throttle:120,1');
 
 // Kupon publik untuk banner beranda.
 Route::get('/promos', [PromoController::class, 'index'])
