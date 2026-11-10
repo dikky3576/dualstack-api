@@ -23,6 +23,7 @@ class Coupon extends Model
         'starts_at',
         'expires_at',
         'is_active',
+        'is_public',
     ];
 
     protected function casts(): array
@@ -36,6 +37,7 @@ class Coupon extends Model
             'starts_at' => 'datetime',
             'expires_at' => 'datetime',
             'is_active' => 'boolean',
+            'is_public' => 'boolean',
         ];
     }
 

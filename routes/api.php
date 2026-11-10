@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\SitemapController;
+use App\Http\Controllers\Api\PromoController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
@@ -100,7 +101,8 @@ Route::middleware(['auth:sanctum', 'admin'])
             'updateRole',
         ]);
 
-        // Kupon diskon.
+        // Kupon diskon. Rute bulk sebelum apiResource agar tidak tertukar.
+        Route::post('coupons/bulk', [AdminCouponController::class, 'bulk']);
         Route::apiResource('coupons', AdminCouponController::class)
             ->except(['show']);
 
@@ -226,6 +228,10 @@ Route::middleware('auth:sanctum')->get(
 
 // Sitemap untuk mesin pencari (dirujuk dari robots.txt frontend).
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])
+    ->middleware('throttle:60,1');
+
+// Kupon publik untuk banner beranda.
+Route::get('/promos', [PromoController::class, 'index'])
     ->middleware('throttle:60,1');
 
 Route::get('/categories', [CategoryController::class, 'index']);

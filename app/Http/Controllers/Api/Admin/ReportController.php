@@ -60,8 +60,35 @@ class ReportController extends Controller
                 (clone $paidOrders)->sum('total_amount')
             ),
 
+            // Total potongan kupon pada pembayaran periode ini.
+            'coupon_discount_total' => (float) (
+                (clone $paidOrders)->sum('coupon_discount')
+            ),
+
             'currency' => 'IDR',
         ];
+
+        // Kupon yang dipakai pada pembayaran periode ini.
+        $topCoupons = Order::query()
+            ->where('payment_status', 'paid')
+            ->whereNotNull('paid_at')
+            ->whereBetween('paid_at', [$startDate, $endDate])
+            ->whereNotNull('coupon_code')
+            ->where('coupon_discount', '>', 0)
+            ->select('coupon_code')
+            ->selectRaw('COUNT(*) as uses')
+            ->selectRaw('SUM(coupon_discount) as discount_total')
+            ->selectRaw('SUM(total_amount) as revenue')
+            ->groupBy('coupon_code')
+            ->orderByDesc('uses')
+            ->limit(10)
+            ->get()
+            ->map(fn ($row) => [
+                'code' => $row->coupon_code,
+                'uses' => (int) $row->uses,
+                'discount_total' => (float) $row->discount_total,
+                'revenue' => (float) $row->revenue,
+            ]);
 
         // Pendapatan dikelompokkan berdasarkan tanggal pembayaran.
         $dailyRevenue = Order::query()
@@ -134,6 +161,7 @@ class ReportController extends Controller
                 'summary' => $summary,
                 'daily_revenue' => $dailyRevenue,
                 'top_products' => $topProducts,
+                'top_coupons' => $topCoupons,
                 'recent_paid_orders' => $recentPaidOrders,
             ],
         ]);

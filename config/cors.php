@@ -11,7 +11,18 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    // Hanya frontend sendiri. Webhook Midtrans memanggil server-ke-server,
+    // jadi tidak terpengaruh CORS. Tambah domain lain lewat CORS_ALLOWED_ORIGINS
+    // (dipisah koma) bila perlu.
+    'allowed_origins' => array_values(array_unique(array_filter(array_merge(
+        [
+            rtrim((string) env('FRONTEND_URL', 'https://dualstack.my.id'), '/'),
+            'https://dualstack.my.id',
+            'https://www.dualstack.my.id',
+            'http://localhost:5173',
+        ],
+        array_map('trim', explode(',', (string) env('CORS_ALLOWED_ORIGINS', ''))),
+    )))),
 
     'allowed_origins_patterns' => [],
 

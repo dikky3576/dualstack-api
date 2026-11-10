@@ -36,6 +36,10 @@ class OrderPaid extends Notification
             $mail->line('• '.$item->product_name.' — '.$this->rupiah($item->line_total));
         }
 
+        if ((float) $order->coupon_discount > 0) {
+            $mail->line('Kupon '.$order->coupon_code.': −'.$this->rupiah($order->coupon_discount));
+        }
+
         return $mail
             ->line('**Total dibayar: '.$this->rupiah($order->total_amount).'**')
             ->action('Unduh template', rtrim((string) config('app.frontend_url'), '/').'/account/downloads')
