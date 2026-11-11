@@ -18,11 +18,20 @@ class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $filter = $request->query('filter');
+
         $orders = Order::query()
             ->where('user_id', $request->user()->id)
+            // unpaid: menunggu bayar. paid: sudah lunas. cancelled: dibatalkan.
+            ->when($filter === 'unpaid', fn ($q) => $q
+                ->where('status', 'pending')
+                ->where('payment_status', 'pending'))
+            ->when($filter === 'paid', fn ($q) => $q->where('payment_status', 'paid'))
+            ->when($filter === 'cancelled', fn ($q) => $q->where('status', 'cancelled'))
             ->with('items:id,order_id,product_name,product_slug,quantity,unit_price,discount_amount,line_total')
             ->latest()
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
         return response()->json([
             'success' => true,
