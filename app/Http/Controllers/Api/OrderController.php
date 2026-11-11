@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Support\CouponResolver;
+use App\Support\DokuClient;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -246,8 +247,47 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Gateway pembayaran yang siap dipakai (kuncinya sudah diisi di .env).
+     */
+    public function gateways(): JsonResponse
+    {
+        $gateways = [];
+
+        if (filled(config('services.midtrans.server_key')) && filled(config('services.midtrans.client_key'))) {
+            $gateways[] = [
+                'id' => 'midtrans',
+                'name' => 'Midtrans',
+                'description' => 'Kartu, e-wallet, transfer bank, minimarket.',
+            ];
+        }
+
+        if (DokuClient::enabled()) {
+            $gateways[] = [
+                'id' => 'doku',
+                'name' => 'DOKU',
+                'description' => 'Transfer bank, DOKU e-wallet, minimarket.',
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Metode pembayaran berhasil diambil.',
+            'data' => $gateways,
+        ]);
+    }
+
     public function payment(Request $request, string $id): JsonResponse
     {
+        $gateway = $request->input('gateway', 'midtrans');
+
+        if (! in_array($gateway, ['midtrans', 'doku'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Metode pembayaran tidak dikenal.',
+            ], 422);
+        }
+
         $order = Order::query()
             ->where('user_id', $request->user()->id)
             ->with('items')
@@ -265,6 +305,21 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Pesanan tidak memenuhi syarat pembayaran.',
             ], 422);
+        }
+
+        // Pembayaran yang sudah dimulai di satu gateway tidak dipindah ke yang
+        // lain, supaya satu pesanan tidak bisa dibayar dua kali.
+        $started = $order->payment_method;
+
+        if ($started !== null && $started !== ($gateway === 'doku' ? 'doku_checkout' : 'midtrans_snap')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pembayaran pesanan ini sudah dimulai dengan metode lain. Lanjutkan dengan metode tersebut atau batalkan pesanan.',
+            ], 422);
+        }
+
+        if ($gateway === 'doku') {
+            return $this->payWithDoku($request, $order);
         }
 
         $serverKey = config('services.midtrans.server_key');
@@ -329,6 +384,7 @@ class OrderController extends Controller
                 'success' => true,
                 'message' => 'Transaksi pembayaran berhasil dibuat.',
                 'data' => [
+                    'gateway' => 'midtrans',
                     'order_number' => $order->order_number,
                     'gross_amount' => $grossAmount,
                     'token' => $transaction->token,
@@ -348,5 +404,67 @@ class OrderController extends Controller
                 'message' => 'Gagal membuat transaksi pembayaran. Periksa log server.',
             ], 502);
         }
+    }
+
+    /**
+     * DOKU Checkout: membuat invoice lalu mengembalikan URL halaman bayarnya.
+     * Memanggil ulang memakai invoice yang sama selama belum kedaluwarsa.
+     */
+    private function payWithDoku(Request $request, Order $order): JsonResponse
+    {
+        if (! DokuClient::enabled()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Konfigurasi pembayaran belum tersedia.',
+            ], 503);
+        }
+
+        $data = fn (string $url) => [
+            'gateway' => 'doku',
+            'order_number' => $order->order_number,
+            'gross_amount' => (int) round((float) $order->total_amount),
+            'redirect_url' => $url,
+        ];
+
+        if ($order->payment_method === 'doku_checkout' && $order->payment_url) {
+            if ($order->payment_expires_at && $order->payment_expires_at->isFuture()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Transaksi pembayaran berhasil dibuat.',
+                    'data' => $data($order->payment_url),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice pembayaran sudah kedaluwarsa. Buat pesanan baru.',
+            ], 422);
+        }
+
+        try {
+            $url = DokuClient::createCheckout($order, $request->user());
+        } catch (\Throwable $e) {
+            Log::error('DOKU checkout creation failed', [
+                'order_id' => $order->order_number,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat transaksi pembayaran. Periksa log server.',
+            ], 502);
+        }
+
+        $order->payment_method = 'doku_checkout';
+        $order->payment_url = $url;
+        $order->payment_expires_at = now()->addMinutes(DokuClient::DUE_MINUTES);
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaksi pembayaran berhasil dibuat.',
+            'data' => $data($url),
+        ]);
     }
 }

@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\Admin\ProjectRequestController as AdminProjectReque
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MidtransWebhookController;
+use App\Http\Controllers\Api\DokuWebhookController;
 use App\Http\Controllers\Api\ProductDownloadController;
 use App\Http\Controllers\Api\CustomerDashboardController;
 use App\Http\Controllers\Api\ProfileController;
@@ -214,6 +215,7 @@ Route::middleware('auth:sanctum')->post(
 
 Route::middleware('auth:sanctum')->prefix('orders')->group(function () {
     Route::get('/', [OrderController::class, 'index']);
+    Route::get('/gateways', [OrderController::class, 'gateways']);
     Route::get('/{id}', [OrderController::class, 'show']);
     Route::post('/{id}/payment', [OrderController::class, 'payment']);
     Route::post('/{id}/cancel', [OrderController::class, 'cancel']);
@@ -224,6 +226,11 @@ Route::middleware('auth:sanctum')->prefix('orders')->group(function () {
 
 Route::post('/midtrans/notification', [
     MidtransWebhookController::class,
+    'handle',
+]);
+
+Route::post('/doku/notification', [
+    DokuWebhookController::class,
     'handle',
 ]);
 

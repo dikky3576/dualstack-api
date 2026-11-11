@@ -24,6 +24,8 @@ class Order extends Model
         'status',
         'payment_status',
         'payment_method',
+        'payment_url',
+        'payment_expires_at',
         'paid_at',
         'notes',
     ];
@@ -36,6 +38,7 @@ class Order extends Model
             'coupon_discount' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'paid_at' => 'datetime',
+            'payment_expires_at' => 'datetime',
         ];
     }
 
