@@ -254,7 +254,11 @@ class OrderController extends Controller
     {
         $gateways = [];
 
-        if (filled(config('services.midtrans.server_key')) && filled(config('services.midtrans.client_key'))) {
+        if (
+            config('services.midtrans.enabled') &&
+            filled(config('services.midtrans.server_key')) &&
+            filled(config('services.midtrans.client_key'))
+        ) {
             $gateways[] = [
                 'id' => 'midtrans',
                 'name' => 'Midtrans',
@@ -320,6 +324,15 @@ class OrderController extends Controller
 
         if ($gateway === 'doku') {
             return $this->payWithDoku($request, $order);
+        }
+
+        // Midtrans dimatikan sementara: hanya pesanan yang sudah terlanjur
+        // dimulai lewat Midtrans yang boleh melanjutkan.
+        if (! config('services.midtrans.enabled') && $started === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Metode pembayaran ini sedang tidak tersedia. Pilih metode lain.',
+            ], 422);
         }
 
         $serverKey = config('services.midtrans.server_key');
