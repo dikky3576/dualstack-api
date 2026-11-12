@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\CustomerDashboardController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CustomerWishlistController;
 use App\Http\Controllers\Api\CustomerDownloadController;
+use App\Http\Controllers\Api\OwnedProductController;
 use App\Http\Controllers\Api\ProductReviewController;
 
 Route::get('/user', function (Request $request) {
@@ -174,6 +175,9 @@ Route::middleware('auth:sanctum')
             CustomerWishlistController::class,
             'store',
         ]);
+
+        // Slug template berbayar yang sudah dibeli (untuk tombol di katalog).
+        Route::get('/owned', [OwnedProductController::class, 'index']);
 
         // Template gratis yang pernah diunduh pelanggan.
         Route::get('/downloads', [

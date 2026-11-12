@@ -25,6 +25,7 @@ class Order extends Model
         'payment_status',
         'payment_method',
         'payment_url',
+        'payment_request_id',
         'payment_expires_at',
         'paid_at',
         'notes',

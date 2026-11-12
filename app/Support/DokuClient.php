@@ -62,11 +62,12 @@ class DokuClient
     }
 
     /**
-     * Membuat invoice di DOKU dan mengembalikan URL halaman bayarnya.
+     * Membuat invoice di DOKU.
      *
+     * @return array{0: string, 1: string} [URL halaman bayar, Request-Id yang dipakai]
      * @throws RuntimeException bila DOKU menolak atau tidak terjangkau
      */
-    public static function createCheckout(Order $order, User $user): string
+    public static function createCheckout(Order $order, User $user): array
     {
         $clientId = (string) config('services.doku.client_id');
         $secret = (string) config('services.doku.secret_key');
@@ -131,7 +132,50 @@ class DokuClient
             );
         }
 
-        return $url;
+        return [$url, $requestId];
+    }
+
+    /**
+     * Membatalkan invoice yang belum dibayar (Cancel Order API).
+     *
+     * Hanya untuk Transfer Bank dan QRIS, dan fiturnya harus dinyalakan di
+     * DOKU Back Office (Order Cancellation). Di luar itu DOKU menolak, dan
+     * pemanggil cukup menganggapnya gagal tanpa menghentikan pembatalan lokal.
+     */
+    public static function cancel(string $invoice, string $originalRequestId, string $note): bool
+    {
+        $clientId = (string) config('services.doku.client_id');
+        $secret = (string) config('services.doku.secret_key');
+        $target = '/checkout/v3/cancellations';
+
+        $body = json_encode([
+            'order' => ['invoice_number' => $invoice],
+            'payment' => ['original_request_id' => $originalRequestId],
+            'note' => $note,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $timestamp = gmdate('Y-m-d\TH:i:s\Z');
+
+        $response = Http::withHeaders([
+            'Client-Id' => $clientId,
+            'Request-Id' => $requestId,
+            'Request-Timestamp' => $timestamp,
+            'Signature' => self::signature($clientId, $requestId, $timestamp, $target, $body, $secret),
+        ])
+            ->withBody($body, 'application/json')
+            ->timeout(15)
+            ->post(self::baseUrl().$target);
+
+        if (! $response->successful()) {
+            \Illuminate\Support\Facades\Log::warning('DOKU cancel rejected', [
+                'invoice' => $invoice,
+                'status' => $response->status(),
+                'body' => mb_substr($response->body(), 0, 500),
+            ]);
+        }
+
+        return $response->successful();
     }
 
     /**

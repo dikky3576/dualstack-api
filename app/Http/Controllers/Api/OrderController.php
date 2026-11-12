@@ -112,6 +112,50 @@ class OrderController extends Controller
             }
         }
 
+        if ($order->payment_method === 'doku_checkout' && DokuClient::enabled()) {
+            // Sudah dibayar tapi notifikasinya belum masuk: jangan dibatalkan.
+            try {
+                $remote = DokuClient::fetchStatus($order->order_number);
+            } catch (\Throwable) {
+                $remote = null;
+            }
+
+            if ($remote !== null && $remote['status'] === 'SUCCESS') {
+                $settled = DokuSettlement::apply(
+                    $order->order_number,
+                    $remote['amount'] ?? $order->total_amount,
+                    'SUCCESS',
+                );
+
+                if ($settled['paid']) {
+                    DokuSettlement::sendPaidEmail($order->id);
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pembayaran untuk pesanan ini sudah kami terima, jadi pesanan tidak dapat dibatalkan. Muat ulang halaman.',
+                ], 409);
+            }
+
+            // Batalkan juga invoice di DOKU (hanya Transfer Bank dan QRIS yang
+            // didukung). Bila ditolak, pesanan tetap dibatalkan di sini; kalau
+            // invoice itu dibayar belakangan, webhook menyelesaikan pesanannya.
+            if ($order->payment_request_id) {
+                try {
+                    DokuClient::cancel(
+                        $order->order_number,
+                        $order->payment_request_id,
+                        'Dibatalkan oleh pelanggan',
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('DOKU cancel failed', [
+                        'order_id' => $order->order_number,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
         $cancelled = DB::transaction(function () use ($order) {
             $fresh = Order::whereKey($order->id)->lockForUpdate()->first();
 
@@ -503,7 +547,7 @@ class OrderController extends Controller
         }
 
         try {
-            $url = DokuClient::createCheckout($order, $request->user());
+            [$url, $requestId] = DokuClient::createCheckout($order, $request->user());
         } catch (\Throwable $e) {
             Log::error('DOKU checkout creation failed', [
                 'order_id' => $order->order_number,
@@ -519,6 +563,7 @@ class OrderController extends Controller
 
         $order->payment_method = 'doku_checkout';
         $order->payment_url = $url;
+        $order->payment_request_id = $requestId;
         $order->payment_expires_at = now()->addMinutes(DokuClient::DUE_MINUTES);
         $order->save();
 
