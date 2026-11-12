@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Support\CouponResolver;
 use App\Support\DokuClient;
+use App\Support\DokuSettlement;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,6 +49,8 @@ class OrderController extends Controller
             ->where('user_id', $request->user()->id)
             ->with('items:id,order_id,product_name,product_slug,quantity,unit_price,discount_amount,line_total')
             ->findOrFail($id);
+
+        $this->syncDokuStatus($order);
 
         return response()->json([
             'success' => true,
@@ -243,6 +247,50 @@ class OrderController extends Controller
         if ($order->payment_method !== null) {
             throw ValidationException::withMessages([
                 'coupon_code' => ['Pembayaran sudah dimulai, jadi kupon tidak bisa diubah lagi. Buat pesanan baru bila ingin memakai kupon lain.'],
+            ]);
+        }
+    }
+
+    /**
+     * Cadangan notifikasi DOKU: untuk pesanan DOKU yang masih menunggu, tanyakan
+     * statusnya langsung ke DOKU (paling sering tiap 10 detik per pesanan).
+     * Jadi pembayaran tetap tercatat walau webhook tidak sampai.
+     */
+    private function syncDokuStatus(Order $order): void
+    {
+        if (
+            $order->payment_method !== 'doku_checkout' ||
+            $order->payment_status !== 'pending' ||
+            ! DokuClient::enabled() ||
+            ! Cache::add('doku-sync:'.$order->id, 1, 10)
+        ) {
+            return;
+        }
+
+        try {
+            $remote = DokuClient::fetchStatus($order->order_number);
+
+            if ($remote === null) {
+                return;
+            }
+
+            $result = DokuSettlement::apply(
+                $order->order_number,
+                $remote['amount'] ?? $order->total_amount,
+                $remote['status'],
+            );
+
+            if ($result['order'] instanceof Order) {
+                $order->refresh();
+            }
+
+            if ($result['paid']) {
+                DokuSettlement::sendPaidEmail($order->id);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('DOKU status sync failed', [
+                'order_id' => $order->order_number,
+                'message' => $e->getMessage(),
             ]);
         }
     }

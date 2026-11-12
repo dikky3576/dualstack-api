@@ -39,18 +39,22 @@ class DokuClient
         string $requestId,
         string $timestamp,
         string $target,
-        string $body,
+        ?string $body,
         string $secret,
     ): string {
-        $digest = base64_encode(hash('sha256', $body, true));
-
-        $component = implode("\n", [
+        $lines = [
             'Client-Id:'.$clientId,
             'Request-Id:'.$requestId,
             'Request-Timestamp:'.$timestamp,
             'Request-Target:'.$target,
-            'Digest:'.$digest,
-        ]);
+        ];
+
+        // Request tanpa body (GET) tidak memakai Digest.
+        if ($body !== null) {
+            $lines[] = 'Digest:'.base64_encode(hash('sha256', $body, true));
+        }
+
+        $component = implode("\n", $lines);
 
         return 'HMACSHA256='.base64_encode(
             hash_hmac('sha256', $component, $secret, true)
@@ -128,6 +132,46 @@ class DokuClient
         }
 
         return $url;
+    }
+
+    /**
+     * Menanyakan status invoice langsung ke DOKU (Check Status API).
+     * Cadangan bila notifikasi belum/tidak sampai.
+     *
+     * @return array{status: string, amount: mixed}|null null bila belum ada statusnya
+     */
+    public static function fetchStatus(string $invoice): ?array
+    {
+        $clientId = (string) config('services.doku.client_id');
+        $secret = (string) config('services.doku.secret_key');
+
+        $target = '/orders/v1/status/'.rawurlencode($invoice);
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $timestamp = gmdate('Y-m-d\TH:i:s\Z');
+
+        $response = Http::withHeaders([
+            'Client-Id' => $clientId,
+            'Request-Id' => $requestId,
+            'Request-Timestamp' => $timestamp,
+            'Signature' => self::signature($clientId, $requestId, $timestamp, $target, null, $secret),
+        ])
+            ->timeout(15)
+            ->get(self::baseUrl().$target);
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $status = $response->json('transaction.status') ?? $response->json('response.transaction.status');
+
+        if (! is_string($status) || $status === '') {
+            return null;
+        }
+
+        return [
+            'status' => strtoupper($status),
+            'amount' => $response->json('order.amount') ?? $response->json('response.order.amount'),
+        ];
     }
 
     /**
